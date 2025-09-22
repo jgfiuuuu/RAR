@@ -17,13 +17,13 @@ TRAIN:
   model_save_filename: medseg
 
 MODEL:
-  bert_type: /media/userdisk1/hluo/project/LanGuideMedSeg-MICCAI2023-main/lib/BiomedVLP-CXR-BERT-specialized
-  vision_type: /media/userdisk1/hluo/project/LanGuideMedSeg/lib/convnext-tiny-224
+  bert_type: ../lib/BiomedVLP-CXR-BERT-specialized    #specialized
+  vision_type: ../lib/convnext-tiny-224
   project_dim: 768
 
 DATA:
-  train_csv_path: ../LanGuideMedSeg-MICCAI2023-main/data/QaTa-COV19-v2/prompt/train.csv   #QaTa-COV19-v2   MoNuSeg  breast_tumors  brain_tumors
-  train_root_path: ../LanGuideMedSeg-MICCAI2023-main/data/QaTa-COV19-v2/Train
-
-  test_csv_path: ../LanGuideMedSeg-MICCAI2023-main/data/QaTa-COV19-v2/prompt/test.csv
-  test_root_path: ../LanGuideMedSeg-MICCAI2023-main/data/QaTa-COV19-v2/Test            
+  train_csv_path: ../data/QaTa-COV19-v2/prompt/train.csv       # MosMed  QaTa-COV19-v2 breast_tumors   brain_tumors MoNuSeg
+  train_root_path: ../data/QaTa-COV19-v2/Train              
+ 
+  test_csv_path: ../data/QaTa-COV19-v2/prompt/test.csv           
+  test_root_path: ../data/QaTa-COV19-v2/Test                   

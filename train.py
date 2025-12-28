@@ -56,8 +56,8 @@ if __name__ == '__main__':
                       mode='pretrain')
     dl_labeled = DataLoader(ds_labeled, batch_size=args.train_batch_size, shuffle=True, num_workers=args.train_batch_size)
 
-    ds_valid = QaTa(csv_path=args.test_csv_path,
-                    root_path=args.test_root_path,
+    ds_valid = QaTa(csv_path=args.train_csv_path,
+                    root_path=args.train_root_path,
                     tokenizer=args.bert_type,
                     image_size=args.image_size,
                     mode='valid')

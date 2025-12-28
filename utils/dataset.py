@@ -24,20 +24,21 @@ class QaTa(Dataset):
         self.caption_list = list(self.data['Description'])
 
         if mode == 'pretrain':
-            self.image_list = self.image_list[:int(0.25*len(self.image_list))]
-            self.caption_list = self.caption_list[:int(0.25*len(self.caption_list))]
+            self.image_list = self.image_list[:int(0.2*len(self.image_list))]
+            self.caption_list = self.caption_list[:int(0.2*len(self.caption_list))]
 
         if mode == 'semi':
-            self.labeled_image_list = self.image_list[:int(0.25 * len(self.image_list))]
-            self.unlabeled_image_list = self.image_list[int(0.25 * len(self.image_list)):]
+            self.labeled_image_list = self.image_list[:int(0.2 * len(self.image_list))]
+            self.unlabeled_image_list = self.image_list[int(0.2 * len(self.image_list)):int(0.8 * len(self.image_list))]
 
-            self.labeled_caption_list = self.caption_list[:int(0.25 * len(self.caption_list))]
-            self.unlabeled_caption_list = self.caption_list[int(0.25 * len(self.caption_list)):]
+            self.labeled_caption_list = self.caption_list[:int(0.2 * len(self.caption_list))]
+            self.unlabeled_caption_list = self.caption_list[int(0.2 * len(self.caption_list)):int(0.8 * len(self.caption_list))]
 
             self.image_list = self.labeled_image_list + self.unlabeled_image_list
             self.caption_list = self.labeled_caption_list + self.unlabeled_caption_list
         elif mode == 'valid':
-            pass
+            self.image_list = self.image_list[int(0.8*len(self.image_list)):]
+            self.caption_list = self.caption_list[int(0.8*len(self.caption_list)):]
         else:
             pass   # for mode is 'test'
 

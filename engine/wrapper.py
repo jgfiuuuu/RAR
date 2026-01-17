@@ -42,7 +42,7 @@ def contrastive_loss(feat_q, feat_pos, feat_neg_all, temperature=0.1):
 
 class RARSegWrapper(pl.LightningModule):
 
-    def __init__(self, args,mode = 'pretrain',weight_consistency=1, weight_contrastive=0.05):
+    def __init__(self, args,mode = 'pretrain',weight_consistency=0.5, weight_contrastive=0.5):
         
         super(RARSegWrapper, self).__init__()
         self.mode = mode

@@ -80,74 +80,6 @@ class VisionModel(nn.Module):#
 
 
         return output['hidden_states']
-    
-class PositionalEncoding(nn.Module):
-
-    def __init__(self, d_model:int, dropout=0, max_len:int=5000) -> None:
-
-        super(PositionalEncoding, self).__init__()
-        
-        self.dropout = nn.Dropout(p=dropout)
-        pe = torch.zeros(max_len, d_model)
-        position = torch.arange(0, max_len).unsqueeze(1) 
-        div_term = torch.exp(torch.arange(0, d_model, 2) * -(math.log(10000.0) / d_model))
-        pe[:, 0::2] = torch.sin(position * div_term) 
-        pe[:, 1::2] = torch.cos(position * div_term) 
-        pe = pe.unsqueeze(0)  # size=(1, L, d_model)
-        self.register_buffer('pe', pe)  
-
-    def forward(self, x):
-        x = x + nn.Parameter(self.pe[:, :x.size(1)],requires_grad=False) #size = [batch, L, d_model]
-        return self.dropout(x) # size = [batch, L, d_model]
-
-class TextProjector(nn.Module):
-    def __init__(self, input_text_len, output_text_len, embed_dim, in_channels):
-        super(TextProjector, self).__init__()
-        
-        self.conv1d = nn.Conv1d(input_text_len, output_text_len, kernel_size=1, stride=1)
-        self.gelu = nn.GELU()
-        self.linear = nn.Linear(embed_dim, in_channels)
-        self.leaky_relu = nn.LeakyReLU()
-
-    def forward(self, x):
-        x = self.conv1d(x) 
-        x = self.gelu(x)   
-        x = self.linear(x) 
-        x = self.leaky_relu(x)  
-        return x
-
-#####attention#######   
-class crossAttention(nn.Module):
-
-    def __init__(self, in_channels:int, output_text_len:int, input_text_len:int=24, embed_dim:int=768,mode='pretrain'):
-        super(crossAttention, self).__init__()
-
-        self.cross_attn = nn.MultiheadAttention(embed_dim=in_channels,num_heads=4,batch_first=True)
-        self.norm2 = nn.LayerNorm(in_channels)
-        self.cross_attn_norm = nn.LayerNorm(in_channels)
-        self.vis_pos = PositionalEncoding(in_channels)
-        self.txt_pos = PositionalEncoding(in_channels,max_len=output_text_len)
-        self.text_project = TextProjector(input_text_len, output_text_len, embed_dim, in_channels)
-        self.scale = nn.Parameter(torch.tensor(1.421),requires_grad=True)
-        if mode =='pretrain':
-            self.scale.requires_grad = True
-        else:
-            self.scale.requires_grad = False
-            
-    def forward(self, vis,txt):
-        
-        txt = self.text_project(txt)
-        B, C, H, W = vis.shape
-        vis = rearrange(vis,'B C H W -> B (H W) C')        
-        #print(vis.shape,txt.shape)
-        vis2,_ = self.cross_attn(query=self.vis_pos(vis),
-                                key=self.txt_pos(txt),
-                                value=txt)
-        vis2 = self.cross_attn_norm(vis2)
-        vis = vis + self.scale*vis2
-        vis = rearrange(vis,'B (H W) C -> B C H W',H=H,W=W)
-    
-        return  vis,txt
 
     
 class Expertfg(nn.Module):
@@ -179,7 +111,6 @@ class RARSeg(nn.Module):
         self.decoder1 = SubpixelUpsample(2,96,24,4)
         self.out = UnetOutBlock(2, in_channels=24, out_channels=1)
         
-        self.crossAttention1 = crossAttention(768,24,mode=mode)
 
     def forward(self, data):
         # Encoder
@@ -191,9 +122,10 @@ class RARSeg(nn.Module):
         text_output = self.text_encoder(text['input_ids'], text['attention_mask'])
         text_embeds = text_output['feature'][-1]
         image_features = [feat for feat in image_features]
-        image_features[-1],txt1 = self.crossAttention1(image_features[-1], text_embeds)
-
         
+        has_text = (text['attention_mask'].sum(dim=1) > 2)
+        b = image_features[-1].shape[0]
+
         
         fg_output_img = self.expert_fg(image_features)    
         fg_output_preds = self.decoder1(fg_output_img[-1])
@@ -202,8 +134,12 @@ class RARSeg(nn.Module):
         
         img = torch.mean(image_features[-1], dim=(2,3), keepdim=False)
         img = img / img.norm(p=2)
-        txt = torch.mean(txt1, dim=1, keepdim=False)
+        txt = torch.mean(text_embeds, dim=1, keepdim=False)
         txt = txt / txt.norm(p=2)
+        
+        if text_embeds is not None:
+            txt_mask_expanded = has_text.view(b, 1).expand_as(txt)
+            txt = torch.where(txt_mask_expanded, txt, torch.zeros_like(txt))
         
         return fg_output,img,txt
     

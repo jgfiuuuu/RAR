@@ -106,35 +106,41 @@ class RARSegWrapper(pl.LightningModule):
 
         return weight
 
-    def _compute_retrieval_losses(self, query_img_feats, query_txt_feats, k=5, temperature=0.1):
-
-     
+    def _compute_retrieval_losses(self, query_img_feats, query_txt_feats, k=5, temperature=0.1, valid_txt_mask=None):
         if len(self.memory_bank) < k: 
-            return None
+            return {
+                'cross_modal': torch.tensor(0.0, device=self.device),
+                'image_image': torch.tensor(0.0, device=self.device)
+            }
             
         db_ids = list(self.memory_bank.keys())
         db_img_features = torch.stack([self.memory_bank[id]['img_feat'] for id in db_ids]).to(self.device)
         db_text_features = torch.stack([self.memory_bank[id]['txt_feat'] for id in db_ids]).to(self.device)
         effective_k = min(k, db_text_features.shape[0])
 
-        sim_matrix_text = cosine_similarity(query_txt_feats, db_text_features)
-        topk_text_weights, topk_text_indices = top_k(sim_matrix_text, k=effective_k)
-        retrieved_img_features_by_text = db_img_features[topk_text_indices]
-        softmax_weights_text = F.softmax(topk_text_weights, dim=-1)
-        positive_img_features_by_text = (softmax_weights_text.unsqueeze(-1) * retrieved_img_features_by_text).sum(dim=1)
+        loss_cross_modal = torch.tensor(0.0, device=self.device)
         
-        loss_cross_modal = contrastive_loss(
-            feat_q=query_img_feats,
-            feat_pos=positive_img_features_by_text,
-            feat_neg_all=db_img_features,
-            temperature=temperature
-        )
-        
+        if valid_txt_mask is not None and valid_txt_mask.any():
+            valid_query_txt_feats = query_txt_feats[valid_txt_mask]
+            valid_query_img_feats = query_img_feats[valid_txt_mask]
 
+            sim_matrix_text = cosine_similarity(valid_query_txt_feats, db_text_features)
+            topk_text_weights, topk_text_indices = top_k(sim_matrix_text, k=effective_k)
+            
+            retrieved_img_features_by_text = db_img_features[topk_text_indices]
+            softmax_weights_text = F.softmax(topk_text_weights, dim=-1)
+            
+            positive_img_features_by_text = (softmax_weights_text.unsqueeze(-1) * retrieved_img_features_by_text).sum(dim=1)
+            
+            loss_cross_modal = contrastive_loss(
+                feat_q=valid_query_img_feats,
+                feat_pos=positive_img_features_by_text,
+                feat_neg_all=db_img_features,
+                temperature=temperature
+            )
         sim_matrix_image = cosine_similarity(query_img_feats, db_img_features)
         topk_img_weights, topk_img_indices = top_k(sim_matrix_image, k=effective_k)
         
-
         retrieved_img_features_by_img = db_img_features[topk_img_indices]
         softmax_weights_img = F.softmax(topk_img_weights, dim=-1)
         positive_img_features_by_img = (softmax_weights_img.unsqueeze(-1) * retrieved_img_features_by_img).sum(dim=1)
@@ -145,7 +151,6 @@ class RARSegWrapper(pl.LightningModule):
             feat_neg_all=db_img_features,
             temperature=temperature
         )
-
 
         return {
             'cross_modal': loss_cross_modal,
